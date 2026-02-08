@@ -1,52 +1,113 @@
 import socket
 
+SEQ_LENGTH = 4
 PACKET_SIZE = 1024
+def send_file(src_socket: socket.socket, dest_socket: socket.socket, data):
+    sequence_id = 0
+    binary_string = format(sequence_id, 'b')
+    print(sequence_id)
+    print(binary_string)
+    src_socket.connect(dest_socket)
+    
+    remaining = len(data) #how many bytes there are left
+    # index where we start reading within data to make a packet
+    bookmark = 0
 
-#sequence id size is 4
-#bits 0 to 15 are source port, 16 to 30 are distination port, 31 to 47 is checksum, 48 to 64 is length
-#bits 65 to 1023 are data
+    # how far we normally read to make a packet
+    # divide PACKET_SIZE by 8 because we are reading bytes
+    reading_length = int(PACKET_SIZE/8)
 
-#there will be 1024-32 = 992 bits of actual data = 124 Bytes
-# localhost = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    while remaining > 0: 
+        # print(remaining)
 
-# source = 0b0000000000000000
-source = "0000000000000000"
-#5001 in binary is 0001001110001001
-# dest = 0b0001001110001001
-dest = "0001001110001001"
-# length = 0b0000010000000000
-length = "0000010000000000"
+        # length of packet we are sending
+        # divide PACKET_SIZE by 8 because we are reading bytes
+        length = min(remaining, reading_length)
 
+        packet = data[bookmark: bookmark + length] 
+        src_socket.send(packet)
 
-# socket.bind(("localhost", "0.0.0.0"))
-def send(source, dest, packet):
-    pass
+        acknowledged = False
+        while not(acknowledged):
+            acknowledged = src_socket.recv(length)
+
+        remaining -= reading_length
+        bookmark += reading_length
+    
+    #remaining should now be 0 or negative      
 
 
 #create a udp socket
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket, open('docker/file.mp3', 'rb') as mp3:
-    udp_socket.bind(("0.0.0.0", 5001))
+    udp_socket.bind(("0.0.0.0", 5000))
+    udp_socket.settimeout(1)
+    udp_socket.listen(1) #only listening to one receiver
 
     #data will be the data read out of the file
-    data = mp3.read() #
-    checksum = hash(data) #this gives different results when hash is used in a different executable
-    checksum = str(checksum)[:16]
-    packet_header = source + dest + checksum + length
+    data = mp3.read() #made of bytes
+    print(type(data))
+
+    send_file(udp_socket, data)
     
 
-    remaining = len(data)
-
-    while remaining > PACKET_SIZE:
-        print(remaining)
-        packet = packet_header + data[]
-        send("localhost", 5001, packet)
-        remaining -= PACKET_SIZE
 
 
-    # print(data[0])
-    # print(data[1])
-    # print(data[2:10])
-    # print (data)
-    print(checksum)
-         
 print("end")
+
+# from timeit import default_timer as timer
+# PACKET_SIZE = 1024
+
+# Throughputs =       []
+# totalPacketDelays = [] # non-cummalitive 
+# Performances =      []
+
+# def avgTime(someList):
+#     avgThing = 0.0 
+#     for time in someList:
+#         avgThing += time
+#     avgThing /= len(someList)
+#     return avgThing
+
+# # Placeholder for sending individual packets
+# def sendPacket(x):
+#     return x
+
+# # PlaceHolder for sending the file
+# def sendFile(x):
+#     startPacket = timer()
+#     PacketDelays = []
+
+#     # replace this line with the actual send packet code
+#     sendPacket(x)
+    
+#     # Keep the same
+#     endPacket = timer()
+#     PacketDelays.append(endPacket-startPacket)
+#     totalPacketDelays.append(endPacket-startPacket)
+#     return 0
+
+# #sending the same file 10 times to get average
+# for x in range(0,10):
+#     startThroughput = timer()
+#     PacketDelays = [] # erase me -- temp var
+#     # replace with actual send file code
+#     sendFile(x)
+
+#     # keep this the same 
+#     endThroughput = timer()
+#     Throughput = PACKET_SIZE / (endThroughput - startThroughput)
+#     avgPacketdelay = avgTime(PacketDelays)
+#     Throughputs.append(Throughput)
+#     performance = .3*Throughput + (0.7/avgPacketdelay)
+#     Performances.append(performance)
+
+
+
+# """
+# Printing the averages of the metrics
+# """
+# avgThroughput = avgTime(Throughputs)
+# avgPacketdelay = avgTime(PacketDelays)
+# avgPerfomance = avgTime(Performances)
+
+# print(f"{avgThroughput:.7f}, {avgPacketdelay:.7f}, {avgPerfomance:.7f}")
