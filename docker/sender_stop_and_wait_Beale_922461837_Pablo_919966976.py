@@ -6,23 +6,27 @@ SEQ_ID_SIZE = 4 #we can make sequence ids between 0-15
 # src_add = "127.0.0.2"
 port_num = 5001
 
-def getSeqID(sequence):
-    output, power = 0, 2^SEQ_ID_SIZE
+def getSeqID(sequence) -> int:
+    #the bytes in sequence are of base 10
+    # output, power = 0, 10^SEQ_ID_SIZE
 
-    for char in sequence:
-        #char is either '0' or '1'
-        output += int(char) * power
-        power/= 2
+    # for char in sequence:
+    #     #char is either '0' or '1'
+    #     output += int.from_bytes(char) * power
+    #     power/= 10
+    thing = 0
 
-    return output
+    # return int(output)
+    return thing
+    # return int.from_bytes(sequence, byteorder='big')
 
 def send_file(src_socket: socket.socket, data):
     sequence_id = 0
-    binary_string = format(sequence_id, 'b')
-    print(sequence_id)
-    print(binary_string)
+    # binary_string = format(sequence_id, 'b')
+    # print(sequence_id)
+    # print(binary_string)
 
-    address, port = src_socket.getsockname()
+    # address, port = src_socket.getsockname()
 
     remaining = len(data) #how many bytes there are left
     # index where we start reading within data to make a packet
@@ -30,26 +34,28 @@ def send_file(src_socket: socket.socket, data):
 
     # how far we normally read to make a packet
     # divide PACKET_SIZE by 8 because we are reading bytes
-    reading_length = int(PACKET_SIZE/8) - SEQ_ID_SIZE
+    reading_length = int((PACKET_SIZE - SEQ_ID_SIZE)/8) 
 
     while remaining > 0: 
         # print(remaining)
         # length of packet we are sending
         length = min(remaining, reading_length)
-
+        head = sequence_id.to_bytes(length=SEQ_ID_SIZE)
         #packet = sequence number concatenated with data
-        packet = sequence_id.to_bytes() + data[bookmark: bookmark + length] 
+        packet = head + data[bookmark: bookmark + length] 
         
         src_socket.send(packet)
 
         acknowledged = False
         while not(acknowledged):
             msg = src_socket.recvfrom(length)
-            if (getSeqID(msg) == sequence_id): acknowledged = True
+            ackHead = msg[:SEQ_ID_SIZE]
+            if (getSeqID(ackHead) == sequence_id): acknowledged = True
             #print(acknowledged)
 
         remaining -= length
         bookmark += length
+        #we want to loop back around to sequence id = 0 if we hit the upper limit
         sequence_id = sequence_id + 1 if sequence_id != 2^SEQ_ID_SIZE - 1 else 0
     #remaining should now be 0 
     return
