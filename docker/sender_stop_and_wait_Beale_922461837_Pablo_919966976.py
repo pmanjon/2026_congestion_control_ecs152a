@@ -22,42 +22,47 @@ def getSeqID(sequence) -> int:
 
 def send_file(src_socket: socket.socket, data):
     sequence_id = 0
-    # binary_string = format(sequence_id, 'b')
-    # print(sequence_id)
-    # print(binary_string)
-
-    # address, port = src_socket.getsockname()
-
     remaining = len(data) #how many bytes there are left
     # index where we start reading within data to make a packet
     bookmark = 0
 
     # how far we normally read to make a packet
-    # divide PACKET_SIZE by 8 because we are reading bytes
-    reading_length = int((PACKET_SIZE - SEQ_ID_SIZE)/8) 
+    reading_length = PACKET_SIZE - SEQ_ID_SIZE
 
     while remaining > 0: 
         # print(remaining)
         # length of packet we are sending
         length = min(remaining, reading_length)
-        head = sequence_id.to_bytes(length=SEQ_ID_SIZE)
+        head = sequence_id.to_bytes(length=SEQ_ID_SIZE, byteorder='big')
+
         #packet = sequence number concatenated with data
         packet = head + data[bookmark: bookmark + length] 
         
         src_socket.send(packet)
 
+        expectedAckHead = sequence_id + length
         acknowledged = False
         while not(acknowledged):
-            msg = src_socket.recvfrom(length)
-            ackHead = msg[:SEQ_ID_SIZE]
-            if (getSeqID(ackHead) == sequence_id): acknowledged = True
+            msg, address = src_socket.recvfrom(length)
+            ackHead =  int.from_bytes(msg[:SEQ_ID_SIZE])
+            acknowledged = ackHead == expectedAckHead
+
+            if(not(acknowledged)): src_socket.send(packet)
+            # if (expectedAckHead == 0): expectedAckHead = length
+
+            # acknowledged = id_received == sequence_id
+            # acknowledged = True
             #print(acknowledged)
 
+        sequence_id += length
         remaining -= length
         bookmark += length
-        #we want to loop back around to sequence id = 0 if we hit the upper limit
-        sequence_id = sequence_id + 1 if sequence_id != 2^SEQ_ID_SIZE - 1 else 0
+
     #remaining should now be 0 
+    last_msg = sequence_id.to_bytes(length=SEQ_ID_SIZE, byteorder='big') \
+             + bytes('==FINACK==', 'utf-8')
+    udp_socket.send(last_msg)
+
     return
 
 #create a udp socket
