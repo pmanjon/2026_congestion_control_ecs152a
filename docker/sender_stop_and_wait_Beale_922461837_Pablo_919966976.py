@@ -1,54 +1,74 @@
 import socket
 
-SEQ_LENGTH = 4
+#this is hardcoded in right now but it needs to abide be the training profile
 PACKET_SIZE = 1024
-def send_file(src_socket: socket.socket, dest_socket: socket.socket, data):
+SEQ_ID_SIZE = 4 #we can make sequence ids between 0-15
+# src_add = "127.0.0.2"
+port_num = 5001
+
+def getSeqID(sequence):
+    output, power = 0, 2^SEQ_ID_SIZE
+
+    for char in sequence:
+        #char is either '0' or '1'
+        output += int(char) * power
+        power/= 2
+
+    return output
+
+def send_file(src_socket: socket.socket, data):
     sequence_id = 0
     binary_string = format(sequence_id, 'b')
     print(sequence_id)
     print(binary_string)
-    src_socket.connect(dest_socket)
-    
+
+    address, port = src_socket.getsockname()
+
     remaining = len(data) #how many bytes there are left
     # index where we start reading within data to make a packet
     bookmark = 0
 
     # how far we normally read to make a packet
     # divide PACKET_SIZE by 8 because we are reading bytes
-    reading_length = int(PACKET_SIZE/8)
+    reading_length = int(PACKET_SIZE/8) - SEQ_ID_SIZE
 
     while remaining > 0: 
         # print(remaining)
-
         # length of packet we are sending
-        # divide PACKET_SIZE by 8 because we are reading bytes
         length = min(remaining, reading_length)
 
-        packet = data[bookmark: bookmark + length] 
+        #packet = sequence number concatenated with data
+        packet = sequence_id.to_bytes() + data[bookmark: bookmark + length] 
+        
         src_socket.send(packet)
 
         acknowledged = False
         while not(acknowledged):
-            acknowledged = src_socket.recv(length)
+            msg = src_socket.recvfrom(length)
+            if (getSeqID(msg) == sequence_id): acknowledged = True
+            #print(acknowledged)
 
-        remaining -= reading_length
-        bookmark += reading_length
-    
-    #remaining should now be 0 or negative      
-
+        remaining -= length
+        bookmark += length
+        sequence_id = sequence_id + 1 if sequence_id != 2^SEQ_ID_SIZE - 1 else 0
+    #remaining should now be 0 
+    return
 
 #create a udp socket
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket, open('docker/file.mp3', 'rb') as mp3:
-    udp_socket.bind(("0.0.0.0", 5000))
-    udp_socket.settimeout(1)
-    udp_socket.listen(1) #only listening to one receiver
+    address, port = udp_socket.getsockname()
+    print(address)
+    print(port)
+
+    udp_socket.connect((address, port_num))
+    # udp_socket.settimeout(1)
+    # udp_socket.listen(1) #only listening to one receiver
 
     #data will be the data read out of the file
     data = mp3.read() #made of bytes
     print(type(data))
 
     send_file(udp_socket, data)
-    
 
 
 
