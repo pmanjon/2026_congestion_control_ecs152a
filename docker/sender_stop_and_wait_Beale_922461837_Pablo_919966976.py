@@ -1,24 +1,12 @@
 import socket
+from timeit import default_timer as timer
 
-#this is hardcoded in right now but it needs to abide be the training profile
 PACKET_SIZE = 1024
-SEQ_ID_SIZE = 4 #we can make sequence ids between 0-15
-# src_add = "127.0.0.2"
+SEQ_ID_SIZE = 4
+DATA_SIZE = PACKET_SIZE - SEQ_ID_SIZE
 port_num = 5001
+# cum_delay = 0 #cumulative packet delays
 
-def getSeqID(sequence) -> int:
-    #the bytes in sequence are of base 10
-    # output, power = 0, 10^SEQ_ID_SIZE
-
-    # for char in sequence:
-    #     #char is either '0' or '1'
-    #     output += int.from_bytes(char) * power
-    #     power/= 10
-    thing = 0
-
-    # return int(output)
-    return thing
-    # return int.from_bytes(sequence, byteorder='big')
 
 def send_file(src_socket: socket.socket, data):
     sequence_id = 0
@@ -27,7 +15,9 @@ def send_file(src_socket: socket.socket, data):
     bookmark = 0
 
     # how far we normally read to make a packet
-    reading_length = PACKET_SIZE - SEQ_ID_SIZE
+    reading_length = DATA_SIZE
+    cum_delay = 0 #cumulative packet delays
+
 
     while remaining > 0: 
         # print(remaining)
@@ -38,6 +28,7 @@ def send_file(src_socket: socket.socket, data):
         #packet = sequence number concatenated with data
         packet = head + data[bookmark: bookmark + length] 
         
+        del_start = timer()
         src_socket.send(packet)
 
         expectedAckHead = sequence_id + length
@@ -48,29 +39,27 @@ def send_file(src_socket: socket.socket, data):
             acknowledged = ackHead == expectedAckHead
 
             if(not(acknowledged)): src_socket.send(packet)
-            # if (expectedAckHead == 0): expectedAckHead = length
 
-            # acknowledged = id_received == sequence_id
-            # acknowledged = True
-            #print(acknowledged)
+        cum_delay += timer() - del_start
+
 
         sequence_id += length
         remaining -= length
         bookmark += length
+
+    print("cum_delay:", cum_delay)
 
     #remaining should now be 0 
     last_msg = sequence_id.to_bytes(length=SEQ_ID_SIZE, byteorder='big') \
              + bytes('==FINACK==', 'utf-8')
     udp_socket.send(last_msg)
 
-    return
+    return cum_delay
 
 #create a udp socket
-with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket, open('docker/file.mp3', 'rb') as mp3:
-    address, port = udp_socket.getsockname()
-    print(address)
-    print(port)
-
+with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket, \
+     open('docker/file.mp3', 'rb') as mp3:
+    address, _ = udp_socket.getsockname()
     udp_socket.connect((address, port_num))
     # udp_socket.settimeout(1)
     # udp_socket.listen(1) #only listening to one receiver
@@ -78,8 +67,19 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket, open('docke
     #data will be the data read out of the file
     data = mp3.read() #made of bytes
     print(type(data))
+    total_sent = len(data)
+    num_of_packets = int(total_sent/DATA_SIZE)
 
-    send_file(udp_socket, data)
+    through_start = timer()
+    total_delay = send_file(udp_socket, data)
+    through_end = timer()
+    throughput = total_sent / (through_end - through_start)
+    avg_delay = total_delay/num_of_packets
+
+    print("throughput is ", throughput)
+    print("average delay of packets:", avg_delay)
+    print("performance:", (0.3 * throughput / 100) + (0.7 * avg_delay))
+    print("num of packets:", num_of_packets)
 
 
 
