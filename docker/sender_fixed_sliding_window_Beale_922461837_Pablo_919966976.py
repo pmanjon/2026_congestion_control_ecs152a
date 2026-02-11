@@ -40,11 +40,13 @@ def sendFile():
         PacketDelays = {}
         window = set()
         while seq_id < len(data) or len(window) > 0:
+            if (packets_left == 0): break
             if (len(window) != WINDOW_SIZE and seq_id < len(data)):
                 cur_mes = seq_id.to_bytes(SEQ_ID_SIZE, byteorder='big', signed=True) + data[seq_id: seq_id + MESSAGE_SIZE]
                 udp_socket.sendto(cur_mes, ("localhost", 5001))
 
                 seq_id += MESSAGE_SIZE
+                # print("seq_id:", seq_id)
                 PacketDelays[seq_id] = timer()
                 window.add(seq_id)
 
@@ -56,10 +58,10 @@ def sendFile():
                     if (ackHead in window):
                         PacketDelays[ackHead] = timer() - PacketDelays[ackHead]
                         window.remove(ackHead)
+                        # print("removed", ackHead)
                         packets_left -= 1
 
                 except socket.timeout:
-                    if (packets_left == 0): break
                     for cur_id in window:
                         actual_id = cur_id - MESSAGE_SIZE
                         new_msg = actual_id.to_bytes(SEQ_ID_SIZE, byteorder='big', signed=True) + data[actual_id: actual_id + MESSAGE_SIZE]
@@ -82,24 +84,29 @@ def sendFile():
 
     return PacketDelays
 
-
+sendFile()
 print("end")
 # #sending the same file 10 times to get average
-# for x in range(0,10):
-#     startThroughput = timer()
-#     PacketDelays = [] # erase me -- temp var
+for x in range(0,10):
+    startThroughput = timer()
     
-#     # replace with actual send file code
-#     sendFile()
+    # replace with actual send file code
+    pack_delays = sendFile()
 
-#     # keep this the same 
-#     endThroughput = timer()
-#     Throughput = PACKET_SIZE / (endThroughput - startThroughput)
-#     avgPacketdelay = avgTime(PacketDelays)
-#     Throughputs.append(Throughput)
-#     performance = .3*Throughput + (0.7/avgPacketdelay)
-#     Performances.append(performance)
+    # keep this the same 
+    endThroughput = timer()
+    # Throughput = PACKET_SIZE / (endThroughput - startThroughput)
+    Throughput = MESSAGE_SIZE / (endThroughput - startThroughput)
+    Throughputs.append(Throughput)
 
+    avgPacketdelay = sum(pack_delays.values()) / len(pack_delays)
+    performance = .3*Throughput + (0.7/avgPacketdelay)
+    Performances.append(performance)
+
+    print("trial", x)
+    print("Throughput:", Throughput)
+    print("Avg packet delay:", avgPacketdelay)
+    print("Performance:", performance)
 
 
 # """
