@@ -18,7 +18,6 @@ def send_file(src_socket: socket.socket, data):
     reading_length = DATA_SIZE
     cum_delay = 0 #cumulative packet delays
 
-
     while remaining > 0: 
         # print(remaining)
         # length of packet we are sending
@@ -34,11 +33,12 @@ def send_file(src_socket: socket.socket, data):
         expectedAckHead = sequence_id + length
         acknowledged = False
         while not(acknowledged):
-            msg, _ = src_socket.recvfrom(length)
-            ackHead =  int.from_bytes(msg[:SEQ_ID_SIZE], byteorder='big')
-            acknowledged = ackHead == expectedAckHead
-
-            if(not(acknowledged)): src_socket.send(packet)
+            try:
+                msg, _ = src_socket.recvfrom(length)
+                ackHead =  int.from_bytes(msg[:SEQ_ID_SIZE], byteorder='big')
+                acknowledged = ackHead == expectedAckHead
+            except socket.timeout:
+                src_socket.send(packet)
 
         cum_delay += timer() - del_start #calculate the packet delay and it to the cumulative delay
         # print(cum_delay)
