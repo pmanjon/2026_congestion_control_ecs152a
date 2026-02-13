@@ -45,7 +45,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket, \
      ssthreshold = 64
      fast_recover = False
      while seq_id < len(data):
-          #print(len(data), seq_id, command_win_size, ssthreshold)
+          # print(len(data), seq_id, command_win_size, ssthreshold)
           # make messages
           messages = []
           for _ in range(command_win_size):
@@ -98,10 +98,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket, \
                except socket.timeout:
                     # if timeout do slow start 
                     ssthreshold = max(int(command_win_size // 2), 1) # must be at least 1
-                    command_win_size = ssthreshold
-                    break
+                    command_win_size = 1
                     # if time out must send last packet to ensure that there is 
                     resendLast(last_ack, udp_socket, len(data))
+                    #break
           # Either still in slow start or in additive increase 
           if command_win_size < ssthreshold:
                command_win_size = min(ssthreshold, (command_win_size * 2) )  
