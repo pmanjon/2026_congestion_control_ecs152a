@@ -18,7 +18,8 @@ def send_file(src_socket: socket.socket, data):
     reading_length = DATA_SIZE
     cum_delay = 0 #cumulative packet delays
 
-    while remaining > 0: 
+    while remaining > 0:
+        # print(sequence_id)
         # print(remaining)
         # length of packet we are sending
         length = min(remaining, reading_length)
@@ -28,7 +29,7 @@ def send_file(src_socket: socket.socket, data):
         packet = head + data[bookmark: bookmark + length] 
         
         del_start = timer() #note the time we sent the packet to calculate packet delay
-        src_socket.send(packet)
+        src_socket.sendto(packet, ("localhost", port_num))
 
         expectedAckHead = sequence_id + length
         acknowledged = False
@@ -38,7 +39,7 @@ def send_file(src_socket: socket.socket, data):
                 ackHead =  int.from_bytes(msg[:SEQ_ID_SIZE], byteorder='big')
                 acknowledged = ackHead == expectedAckHead
             except socket.timeout:
-                src_socket.send(packet)
+                src_socket.sendto(packet,("localhost", port_num))
 
         cum_delay += timer() - del_start #calculate the packet delay and it to the cumulative delay
         # print(cum_delay)
@@ -47,27 +48,25 @@ def send_file(src_socket: socket.socket, data):
         remaining -= length
         bookmark += length
 
-    #remaining should now be 0 
-    print("cum_delay:", cum_delay)
+    # remaining should now be 0 
+    # print("cum_delay:", cum_delay)
 
     #tell receiver we are done sending
     last_msg = sequence_id.to_bytes(length=SEQ_ID_SIZE, byteorder='big') \
              + bytes('==FINACK==', 'utf-8')
-    udp_socket.send(last_msg)
+    udp_socket.sendto(last_msg, ("localhost", port_num))
 
     return cum_delay
 
 #create a udp socket
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket, \
-     open('docker/file.mp3', 'rb') as mp3:
+     open('file.mp3', 'rb') as mp3:
     
-    address, _ = udp_socket.getsockname()
-    udp_socket.connect((address, port_num))
-    # udp_socket.settimeout(1)
+    udp_socket.bind(("localhost", 5000))
+    udp_socket.settimeout(.5)
 
     #data will be the data read out of the file
     data = mp3.read() #made of bytes
-    # print(type(data))
 
     total_sent = len(data)
     num_of_packets = int(total_sent/DATA_SIZE)
@@ -78,68 +77,4 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket, \
     throughput = total_sent / (through_end - through_start)
     avg_delay = total_delay/num_of_packets
 
-    print("throughput is ", throughput)
-    print("average delay of packets:", avg_delay)
-    print("performance:", (0.3 * throughput / 1000) + (0.7 * avg_delay))
-    # print("num of packets:", num_of_packets)
-
-
-# print("end")
-
-# from timeit import default_timer as timer
-# PACKET_SIZE = 1024
-
-# Throughputs =       []
-# totalPacketDelays = [] # non-cummalitive 
-# Performances =      []
-
-# def avgTime(someList):
-#     avgThing = 0.0 
-#     for time in someList:
-#         avgThing += time
-#     avgThing /= len(someList)
-#     return avgThing
-
-# # Placeholder for sending individual packets
-# def sendPacket(x):
-#     return x
-
-# # PlaceHolder for sending the file
-# def sendFile(x):
-#     startPacket = timer()
-#     PacketDelays = []
-
-#     # replace this line with the actual send packet code
-#     sendPacket(x)
-    
-#     # Keep the same
-#     endPacket = timer()
-#     PacketDelays.append(endPacket-startPacket)
-#     totalPacketDelays.append(endPacket-startPacket)
-#     return 0
-
-# #sending the same file 10 times to get average
-# for x in range(0,10):
-#     startThroughput = timer()
-#     PacketDelays = [] # erase me -- temp var
-#     # replace with actual send file code
-#     sendFile(x)
-
-#     # keep this the same 
-#     endThroughput = timer()
-#     Throughput = PACKET_SIZE / (endThroughput - startThroughput)
-#     avgPacketdelay = avgTime(PacketDelays)
-#     Throughputs.append(Throughput)
-#     performance = .3*Throughput + (0.7/avgPacketdelay)
-#     Performances.append(performance)
-
-
-
-# """
-# Printing the averages of the metrics
-# """
-# avgThroughput = avgTime(Throughputs)
-# avgPacketdelay = avgTime(PacketDelays)
-# avgPerfomance = avgTime(Performances)
-
-# print(f"{avgThroughput:.7f}, {avgPacketdelay:.7f}, {avgPerfomance:.7f}")
+    print(f'{throughput:.7f}, {avg_delay:.7f}, {((0.3 * throughput / 1000) + (0.7 * avg_delay)):.7f}')
