@@ -45,7 +45,7 @@ def sendFile():
 
             if (len(window) != WINDOW_SIZE and seq_id + MESSAGE_SIZE < data_length):
                 cur_mes = seq_id.to_bytes(SEQ_ID_SIZE, byteorder='big', signed=True) + data[seq_id: seq_id + MESSAGE_SIZE]
-                udp_socket.sendto(cur_mes, ("localhost", 5001))
+                udp_socket.send(cur_mes)
 
                 seq_id += MESSAGE_SIZE
                 # print("seq_id:", seq_id)
@@ -77,7 +77,7 @@ def sendFile():
                     for cur_id in window:
                         actual_id = cur_id - MESSAGE_SIZE
                         new_msg = actual_id.to_bytes(SEQ_ID_SIZE, byteorder='big', signed=True) + data[actual_id: actual_id + MESSAGE_SIZE]
-                        udp_socket.sendto(new_msg, ("localhost", 5001))
+                        udp_socket.send(new_msg)
                         packetDelays[cur_id] = timer()
         
         cleanseWindow(data, udp_socket, window, packetDelays)
@@ -85,7 +85,7 @@ def sendFile():
         length = min(data_length - seq_id, MESSAGE_SIZE)
         last_packet = seq_id.to_bytes(SEQ_ID_SIZE, byteorder='big', signed=True) + data[seq_id: seq_id + length]
 
-        udp_socket.sendto(last_packet, ("localhost", 5001))
+        udp_socket.send(last_packet)
         packetDelays[seq_id] = timer()
         while(True):
             try:
@@ -95,12 +95,12 @@ def sendFile():
                     packetDelays[seq_id] = timer() - packetDelays[ackHead]
                     break
             except socket.timeout:
-                udp_socket.sendto(last_packet, ("localhost", 5001))
+                udp_socket.send(last_packet)
                 packetDelays[seq_id] = timer()
 
         # final message 
         final_mess = (-1).to_bytes(SEQ_ID_SIZE, byteorder='big',signed = True) + b"==FINACK=="
-        udp_socket.sendto(final_mess, ("localhost", 5001))
+        udp_socket.send(final_mess)
 
     return packetDelays
 
@@ -109,7 +109,7 @@ def cleanseWindow(data, socket: socket.socket, window: set, pack_delays: dict):
         cur_id = window.pop()
         cur_packet = cur_id.to_bytes(SEQ_ID_SIZE, byteorder='big', signed=True) + data[cur_id: cur_id + MESSAGE_SIZE]
 
-        socket.sendto(cur_packet, ("localhost", 5001))
+        socket.send(cur_packet)
         pack_delays[cur_id + MESSAGE_SIZE] = timer()
 
         while(True):
@@ -123,7 +123,7 @@ def cleanseWindow(data, socket: socket.socket, window: set, pack_delays: dict):
                     pack_delays[ackHead] = timer() - pack_delays[ackHead]
                     window.remove(ackHead)
             except socket.timeout:
-                socket.sendto(cur_packet, ("localhost", 5001))
+                socket.send(cur_packet)
                 pack_delays[cur_id + MESSAGE_SIZE] = timer()
 
 startThroughput = timer()
