@@ -38,7 +38,7 @@ def sendFile():
         packetDelays = {}
         window = set()
         # We subtract MESSAGE_SIZE to stop the loop just before we send the last packet
-        # this is so we can empty the window first later then send the last packet
+        # this is so we can empty the window first and then send the last packet
         while seq_id < data_length - MESSAGE_SIZE:
             print(seq_id)
             if (packets_left == 0): break
@@ -118,6 +118,7 @@ def cleanseWindow(data, socket: socket.socket, window: set, pack_delays: dict):
                 ackHead = int.from_bytes(new_data[:SEQ_ID_SIZE],byteorder='big', signed=True)
                 if (ackHead == cur_id + MESSAGE_SIZE): 
                     pack_delays[cur_id + MESSAGE_SIZE] = timer() - pack_delays[ackHead]
+                    window.remove(ackHead)
                     break
                 elif (ackHead in window):
                     pack_delays[ackHead] = timer() - pack_delays[ackHead]
