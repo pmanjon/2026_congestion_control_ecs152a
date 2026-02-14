@@ -116,13 +116,11 @@ def cleanseWindow(data, socket: socket.socket, window: set, pack_delays: dict):
             try:
                 new_data, _ = socket.recvfrom(PACKET_SIZE)
                 ackHead = int.from_bytes(new_data[:SEQ_ID_SIZE],byteorder='big', signed=True)
-                if (ackHead == cur_id + MESSAGE_SIZE): 
-                    pack_delays[cur_id + MESSAGE_SIZE] = timer() - pack_delays[ackHead]
-                    window.remove(ackHead)
-                    break
-                elif (ackHead in window):
+                if (ackHead in window):
                     pack_delays[ackHead] = timer() - pack_delays[ackHead]
                     window.remove(ackHead)
+                
+                if (ackHead == cur_id + MESSAGE_SIZE): break
             except socket.timeout:
                 socket.send(cur_packet)
                 pack_delays[cur_id + MESSAGE_SIZE] = timer()
